@@ -317,14 +317,46 @@ def check_product(product, state, webhook_url, error_notify_after_failures):
 
     soup = BeautifulSoup(html, "html.parser")
     name = configured_name or extract_title(soup, url)
-    status = detect_status(html)
+    raw_status = detect_status(html)
     price_str = extract_price(html)
     price_val = parse_price(price_str)
     image_url = extract_image(soup)
 
-    prev_status = prev.get("status")
+    confirmed_status_before = prev.get("status")
     prev_price_val = parse_price(prev.get("price"))
     had_failures = prev.get("consecutive_failures", 0) >= error_notify_after_failures
+
+    # --- Confirmación doble (anti-flapping) ---
+    # Algunos sitios (links acortados, páginas con anti-bot inconsistente)
+    # devuelven contenido distinto entre una request y la siguiente. Para no
+    # disparar una alerta por una lectura aislada rara, un cambio de estado
+    # solo se "confirma" cuando se lo ve 2 veces seguidas.
+    CONFIRMATIONS_REQUIRED = 2
+    if confirmed_status_before is None:
+        # Primer chequeo de este producto: confirmamos directo, sin esperar.
+        status = raw_status
+        pending_status, pending_streak = None, 0
+    elif raw_status == confirmed_status_before:
+        # Sigue igual que lo confirmado: no hay nada pendiente.
+        status = confirmed_status_before
+        pending_status, pending_streak = None, 0
+    else:
+        # Lectura distinta a lo confirmado: ¿es la primera vez que la vemos,
+        # o ya veníamos viéndola?
+        if raw_status == prev.get("pending_status"):
+            pending_streak = prev.get("pending_streak", 0) + 1
+        else:
+            pending_streak = 1
+        pending_status = raw_status
+        if pending_streak >= CONFIRMATIONS_REQUIRED:
+            status = raw_status  # se confirma el cambio
+            pending_status, pending_streak = None, 0
+        else:
+            status = confirmed_status_before  # todavía no se confirma, esperamos otra lectura
+            log.info("%s: lectura '%s' distinta a lo confirmado ('%s'), esperando confirmación (1/%d)",
+                      name, raw_status, confirmed_status_before, CONFIRMATIONS_REQUIRED)
+
+    prev_status = confirmed_status_before
 
     log.info("%s -> %s %s(antes: %s)", name, status, f"[{price_str}] " if price_str else "", prev_status)
 
@@ -369,6 +401,8 @@ def check_product(product, state, webhook_url, error_notify_after_failures):
         "name": name,
         "last_checked": datetime.now(timezone.utc).isoformat(),
         "consecutive_failures": 0,
+        "pending_status": pending_status,
+        "pending_streak": pending_streak,
     }
 
 
