@@ -373,19 +373,25 @@ def check_product(product, state, webhook_url, error_notify_after_failures):
 
 
 def main():
-    config = load_json(CONFIG_PATH, None)
-    if not config:
-        log.error("No encontré %s. Copiá config.example.json a config.json y completalo.", CONFIG_PATH)
-        sys.exit(1)
+    config = load_json(CONFIG_PATH, {})
 
-    webhook_url = config.get("discord_webhook_url")
+    webhook_url = os.environ.get("DISCORD_WEBHOOK_URL") or config.get("discord_webhook_url")
     if not webhook_url:
-        log.error("Falta 'discord_webhook_url' en %s", CONFIG_PATH)
+        log.error("Falta el webhook: seteá DISCORD_WEBHOOK_URL como variable de entorno, o 'discord_webhook_url' en %s", CONFIG_PATH)
         sys.exit(1)
 
     default_interval = config.get("check_interval_seconds", 300)
     error_notify_after_failures = config.get("error_notify_after_failures", 5)
-    products = config.get("products", [])
+
+    products_json_env = os.environ.get("PRODUCTS_JSON")
+    if products_json_env:
+        try:
+            products = json.loads(products_json_env)
+        except json.JSONDecodeError as e:
+            log.error("PRODUCTS_JSON no es JSON válido: %s", e)
+            sys.exit(1)
+    else:
+        products = config.get("products", [])
     if not products:
         log.warning("No hay productos en 'products'. Agregá al menos uno en %s", CONFIG_PATH)
 
