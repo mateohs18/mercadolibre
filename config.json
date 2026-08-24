@@ -1,6 +1,6 @@
 {
   "discord_webhook_url": "https://discord.com/api/webhooks/1524626220233392148/cLReGBn5V-YrDfjz8zYwjb0Fv1uKVTg210tz4cDxmuyjV48z-JL0Z_hEhvByHrLd8nOc",
-  "check_interval_seconds": 300,
+  "check_interval_seconds": 60,
   "products": [
     {
       "url": "https://electronics.woot.com/offers/grade-a-refurbished-nintendo-switch-2z-0?ref=w_cnt_wp_3_1",
@@ -13,7 +13,7 @@
       "url": "https://www.ebay.com/itm/136522107391?var=",
       "name": "NINTENDO SWITCH 2 EBAY",
       "check_interval_seconds": 60,
-      "target_price": 404.0,
+      "target_price": 404.00,
       "notify_on_price_drop": true
     }
   ]
