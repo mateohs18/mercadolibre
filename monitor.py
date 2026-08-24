@@ -80,6 +80,7 @@ OUT_OF_STOCK_PATTERNS = [
     r"no longer available",
     r"this item is currently not available",
     r"temporarily out of stock",
+    r"this item is out of stock",
 ]
 
 # Frases que indican que SÍ se puede comprar.
@@ -232,14 +233,17 @@ def detect_status(html, debug=False):
         else:
             log.info("DEBUG ningún patrón de out_of_stock matcheó")
 
-    # Si aparece un botón de "Add to cart"/"Comprar ahora" activo, es una señal
-    # mucho más confiable que una frase suelta de "sold out"/"agotado" que
-    # puede estar en un banner de urgencia ("until sold out"), en reseñas,
-    # o en productos relacionados. Por eso el botón manda si está presente.
-    if add_to_cart_match:
-        return "in_stock"
+    # Priorizamos la frase explícita de "sin stock" quejes específica y clara
+    # ("out of stock", "sold out", etc. ya filtrando frases de urgencia tipo
+    # "until sold out"). Un botón de "Add to cart" puede seguir presente en
+    # el HTML crudo aunque esté oculto/deshabilitado por JavaScript del lado
+    # del cliente (algo común en eBay), así que NO puede pisar una frase
+    # explícita de no-disponibilidad; solo lo usamos como respaldo cuando no
+    # hay ninguna señal explícita de "sin stock".
     if out_of_stock_match:
         return "out_of_stock"
+    if add_to_cart_match:
+        return "in_stock"
     return "unknown"
 
 
