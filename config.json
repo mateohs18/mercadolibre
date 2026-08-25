@@ -7,21 +7,18 @@
       "name": "NINTENDO SWITCH 2 WOOT",
       "check_interval_seconds": 60,
       "target_price": 399.99,
-      "notify_on_price_drop": true
     },
     {
       "url": "https://a.co/d/0ho45Cvp",
       "name": "XBOX WIRELESS CONTROLLER – GEARS OF WAR",
       "check_interval_seconds": 60,
       "target_price": 89.99,
-      "notify_on_price_drop": true
     },
     {
       "url": "https://www.ebay.com/itm/136522107391?var=",
       "name": "NINTENDO SWITCH 2 EBAY",
       "check_interval_seconds": 60,
       "target_price": 404.00,
-      "notify_on_price_drop": true
     }
   ]
 }
