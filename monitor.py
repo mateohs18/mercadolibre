@@ -248,7 +248,7 @@ def detect_status(html, debug=False):
 
 
 def send_discord(webhook_url, product_name, url, event_type, status=None, price=None,
-                 image_url=None, old_price=None, extra_note=None):
+                  image_url=None, old_price=None, extra_note=None):
     domain = get_domain(url)
 
     if event_type == "stock":
@@ -287,15 +287,8 @@ def send_discord(webhook_url, product_name, url, event_type, status=None, price=
     if image_url:
         embed["thumbnail"] = {"url": image_url}
 
-    # Preparamos el mensaje
-    payload = {"embeds": [embed]}
-    
-    # Te menciona (ping) si hay stock o bajó el precio
-    if event_type in ("stock", "price_drop"):
-        payload["content"] = "<@911730868316418099>"
-
     try:
-        r = requests.post(webhook_url, json=payload, timeout=15)
+        r = requests.post(webhook_url, json={"embeds": [embed]}, timeout=15)
         if r.status_code >= 300:
             log.error("Error enviando a Discord (%s): %s", r.status_code, r.text)
     except Exception as e:
@@ -387,8 +380,7 @@ def check_product(product, state, webhook_url, error_notify_after_failures):
         crossed_target = (
             target_price is not None
             and price_val <= target_price
-            and prev_price_val is not None
-            and prev_price_val > target_price
+            and (prev_price_val is None or prev_price_val > target_price)
         )
         plain_drop = (
             notify_price_drop
