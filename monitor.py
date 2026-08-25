@@ -284,9 +284,11 @@ def send_discord(webhook_url, product_name, url, event_type, status=None, price=
         "footer": {"text": "Stock Monitor"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+    
     if image_url:
         embed["thumbnail"] = {"url": image_url}
-        payload = {"embeds": [embed]}
+        
+    payload = {"embeds": [embed]}
     
     # Te menciona (ping) si hay stock o bajó el precio
     if event_type in ("stock", "price_drop"):
