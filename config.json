@@ -12,8 +12,8 @@
     {
       "url": "https://electronics.woot.com/offers/grade-a-refurbished-nintendo-switch-2z-0?ref=w_cnt_wp_3_1",
       "name": "XBOX WIRELESS CONTROLLER – GEARS OF WAR",
-      "check_interval_seconds": 60
-       "target_price": 89.99,
+      "check_interval_seconds": 60,
+      "target_price": 89.99,
       "notify_on_price_drop": true
     },
     {
