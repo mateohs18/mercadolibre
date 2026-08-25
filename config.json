@@ -10,6 +10,11 @@
       "notify_on_price_drop": true
     },
     {
+      "url": "https://electronics.woot.com/offers/grade-a-refurbished-nintendo-switch-2z-0?ref=w_cnt_wp_3_1",
+      "name": "Xbox Wireless Controller – Gears of War",
+      "check_interval_seconds": 60,
+    },
+    {
       "url": "https://www.ebay.com/itm/136522107391?var=",
       "name": "NINTENDO SWITCH 2 EBAY",
       "check_interval_seconds": 60,
