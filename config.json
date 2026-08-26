@@ -10,8 +10,8 @@
       "notify_on_price_drop": true
     },
     {
-      "url": "https://www.latamairlines.com/co/es/ofertas-vuelos?dataFlight=%7B%22tripTypeSelected%22%3A%7B%22label%22%3A%22IdayVuelta%22%2C%22value%22%3A%22RT%22%7D%2C%22cabinSelected%22%3A%7B%22label%22%3A%22Economy%22%2C%22value%22%3A%22Economy%22%7D%2C%22passengerSelected%22%3A%7B%22adultQuantity%22%3A1%2C%22childrenQuantity%22%3A0%2C%22infantQuantity%22%3A0%7D%2C%22originSelected%22%3A%7B%22airportName%22%3A%22JChavezIntl.%22%2C%22countryName%22%3A%22Peru%22%2C%22cityName%22%3A%22Lima%22%2C%22airportIataCode%22%3A%22LIM%22%2C%22countryAlpha2%22%3A%22PE%22%7D%2C%22destinationSelected%22%3A%7B%22airportName%22%3A%22AlfonsoBonillaAragon%22%2C%22countryName%22%3A%22Colombia%22%2C%22cityName%22%3A%22Cali%22%2C%22airportIataCode%22%3A%22CLO%22%2C%22countryAlpha2%22%3A%22CO%22%7D%2C%22dateGoSelected%22%3A%222026-10-05T15%3A00%3A00.000Z%22%2C%22dateReturnSelected%22%3A%222026-10-18T15%3A00%3A00.000Z%22%2C%22redemption%22%3Afalse%7D&sort=RECOMMENDED&skyscanner_redirectid=dnHzoOU7SVmX9mzSYz5MTg",
-      "name": "VUELOS COLOMBIA A PERÚ",
+      "url": "https://www.despegar.com.co/shop/flights/detail/LIM/CLO/2026-10-05/2026-10-18/1/0/0/PRb495dae29094416aa19735740f56869829796122?searchId=6c75ecda-8fbb-48b7-afe3-b0e05982c93b&di=1&addons=UPSELLING&currency=COP&searchType=MULTI_ONEWAY&subcl=1_1&cartApplies=true&checkoutIntentId=796427a3-758f-4210-a212-07d5242c21dd",
+      "name": "VUELOS PERU A COLOMBIA",
       "check_interval_seconds": 60,
       "notify_on_price_drop": true
     },
