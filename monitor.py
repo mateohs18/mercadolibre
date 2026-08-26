@@ -65,7 +65,6 @@ def save_json(path, data):
     os.replace(tmp_path, path)
 
 def fetch(url, retries=2, use_browser=False):
-    """Descarga la página. Si use_browser=True, usa un Chrome invisible para evadir bloqueos y renderizar JS."""
     if use_browser:
         try:
             import undetected_chromedriver as uc
@@ -79,15 +78,16 @@ def fetch(url, retries=2, use_browser=False):
             try:
                 log.info("Abriendo navegador fantasma para: %s", get_domain(url))
                 options = uc.ChromeOptions()
-                options.add_argument('--headless') # Invisible
+                options.add_argument('--headless') 
                 options.add_argument('--disable-gpu')
                 options.add_argument('--no-sandbox')
                 
                 driver = uc.Chrome(options=options)
                 driver.get(url)
                 
-                # Le damos 12 segundos a la aerolínea para que cargue los vuelos y el JS
-                time.sleep(12) 
+                # --- CAMBIO IMPORTANTE: 35 segundos para que terminen de buscar los vuelos ---
+                log.info("Esperando 35 segundos a que la página cargue los resultados...")
+                time.sleep(35) 
                 
                 html = driver.page_source
                 driver.quit()
@@ -100,7 +100,6 @@ def fetch(url, retries=2, use_browser=False):
                 continue
         raise last_exc
     else:
-        # Modo tradicional rápido (eBay, Woot, MercadoLibre)
         last_exc = None
         for attempt in range(retries + 1):
             headers = dict(SESSION.headers) if attempt == 0 else {"User-Agent": ALT_USER_AGENT}
@@ -146,10 +145,11 @@ def parse_price(price_str):
     except ValueError: return None
 
 def extract_price_and_currency(html, soup, default_currency="$", find_cheapest=False, min_threshold=None):
-    if find_cheapest:
-        currency_regex = r'([€£¥\$]|(?:R\$)|(?:US\$)|(?:ARS)|(?:MXN)|(?:CLP)|(?:COP)|(?:UYU)|(?:PEN))'
-        number_regex = r'([\d]{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)'
+    # --- CAMBIO IMPORTANTE: Regex expandido para atrapar "COP $", "PEN S/", etc. ---
+    currency_regex = r'([€£¥\$]|(?:R\$)|(?:US\$)|(?:ARS\s?\$?)|(?:MXN\s?\$?)|(?:CLP\s?\$?)|(?:COP\s?\$?)|(?:UYU\s?\$?)|(?:PEN\s?S?/?))'
+    number_regex = r'([\d]{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)'
 
+    if find_cheapest:
         matches1 = re.findall(f'{currency_regex}\\s?{number_regex}', html, re.IGNORECASE)
         matches2 = re.findall(f'{number_regex}\\s?{currency_regex}', html, re.IGNORECASE)
 
@@ -157,12 +157,12 @@ def extract_price_and_currency(html, soup, default_currency="$", find_cheapest=F
         for curr, price_str in matches1:
             val = parse_price(price_str)
             if val and val > 0 and (min_threshold is None or val >= min_threshold):
-                valid_prices.append((val, price_str, curr.upper()))
+                valid_prices.append((val, price_str, curr.strip().upper()))
                 
         for price_str, curr in matches2:
             val = parse_price(price_str)
             if val and val > 0 and (min_threshold is None or val >= min_threshold):
-                valid_prices.append((val, price_str, curr.upper()))
+                valid_prices.append((val, price_str, curr.strip().upper()))
 
         if not valid_prices: return None, default_currency
 
@@ -175,21 +175,22 @@ def extract_price_and_currency(html, soup, default_currency="$", find_cheapest=F
         curr = og_curr["content"] if og_curr and og_curr.get("content") else default_currency
         return og_price["content"], curr
 
-    currency_regex = r'([€£¥\$]|(?:R\$)|(?:US\$)|(?:ARS)|(?:MXN)|(?:CLP)|(?:COP)|(?:UYU)|(?:PEN))'
-    number_regex = r'([\d]{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)'
-
     m1 = re.search(f'{currency_regex}\\s?{number_regex}', html, re.IGNORECASE)
-    if m1: return m1.group(2), m1.group(1).upper()
+    if m1: return m1.group(2), m1.group(1).strip().upper()
     
     m2 = re.search(f'{number_regex}\\s?{currency_regex}', html, re.IGNORECASE)
-    if m2: return m2.group(1), m2.group(2).upper()
+    if m2: return m2.group(1), m2.group(2).strip().upper()
 
     return None, default_currency
 
 def format_price(value, currency):
     if value is None: return "N/A"
-    if len(currency) <= 2 or currency.endswith('$') or currency in ['€', '£', '¥']: return f"{currency}{value:,.2f}"
-    else: return f"{value:,.2f} {currency}"
+    # Limpiamos si la moneda quedó redundante (ej: "COP $" -> "COP")
+    clean_curr = currency.replace("$", "").strip() if len(currency) > 3 else currency
+    if len(clean_curr) <= 2 or clean_curr.endswith('$') or clean_curr in ['€', '£', '¥']: 
+        return f"{clean_curr}{value:,.2f}"
+    else: 
+        return f"{value:,.2f} {clean_curr}"
 
 def get_domain(url):
     m = re.search(r"https?://(?:www\.)?([^/]+)", url)
