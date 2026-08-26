@@ -144,13 +144,11 @@ def parse_price(price_str):
     except ValueError: return None
 
 def extract_price_and_currency(html, soup, default_currency="$", find_cheapest=False, min_threshold=None, domain=""):
-    # Limpiamos el HTML para leer texto puro sin etiquetas basura
     clean_text = soup.get_text(separator=" ", strip=True)
     
     currency_regex = r'([€£¥\$]|R\$|US\$|ARS|MXN|CLP|COP|UYU|PEN|S/)'
     number_regex = r'([\d]{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)'
 
-    # Tolera espacios y signos extras como "COP $ 1.500"
     pattern1 = f'{currency_regex}\\s*\\$?\\s*{number_regex}'
     pattern2 = f'{number_regex}\\s*\\$?\\s*{currency_regex}'
 
@@ -180,7 +178,6 @@ def extract_price_and_currency(html, soup, default_currency="$", find_cheapest=F
         log.info(f"[{domain}] Cazador de ofertas encontró {len(valid_prices)} precios válidos. El más bajo es: {cheapest[2]} {cheapest[0]}")
         return cheapest[1], cheapest[2] 
 
-    # Modo producto individual
     og_price = soup.find("meta", property="og:price:amount")
     if og_price and og_price.get("content"):
         og_curr = soup.find("meta", property="og:price:currency")
@@ -224,7 +221,7 @@ def send_discord(webhook_url, product_name, url, event_type, status=None, price_
     if event_type == "stock": title, color = "🟢 ¡Producto disponible!", 3066993
     elif event_type == "price_drop": title, color = "💸 ¡Bajó de precio!", 16776960
     elif event_type == "error": title, color = "⚠️ No puedo acceder", 15158332
-    else: title, color = "ℹ️ Actualización", 3447003
+    else: title, color = "ℹ️ Actualización de estado", 3447003
 
     fields = [{"name": "Sitio", "value": domain, "inline": True}]
     if status: fields.insert(0, {"name": "Estado", "value": "✅ Disponible" if status == "in_stock" else status, "inline": True})
@@ -276,7 +273,6 @@ def check_product(product, state, webhook_url, error_notify_after_failures):
     
     fallback_curr = product.get("currency_symbol", "$")
     
-    # Extraemos precio con limpieza mejorada
     price_str, currency_sym = extract_price_and_currency(html, soup, fallback_curr, is_search_page, min_threshold, domain)
     price_val = parse_price(price_str)
     
@@ -331,6 +327,16 @@ def main():
     config = load_json(CONFIG_PATH, {})
     webhook_url = os.environ.get("DISCORD_WEBHOOK_URL") or config.get("discord_webhook_url")
     if not webhook_url: sys.exit("Falta discord_webhook_url en config.json")
+
+    # --- MENSAJE DE PRUEBA DE ARRANQUE ---
+    log.info("Enviando mensaje de prueba a Discord para verificar webhook...")
+    send_discord(
+        webhook_url, 
+        "🚀 Bot de Stock Iniciado", 
+        "https://railway.app", 
+        "info", 
+        extra_note="El bot arrancó correctamente en Railway y está vigilando tus links."
+    )
 
     default_interval = config.get("check_interval_seconds", 300)
     error_notify_after_failures = config.get("error_notify_after_failures", 5)
