@@ -1,8 +1,8 @@
 """
-Stock Monitor -> Discord (Híbrido: API + Navegador Fantasma + Logs de Discord)
----------------------------------------------------------------------
-Monitorea tiendas normales rápido, y usa Chrome invisible para 
-vencer el anti-bot de aerolíneas (LATAM, Despegar, etc.).
+Stock Monitor -> Discord (Híbrido: API + Navegador Fantasma + Notificaciones Inmediatas)
+----------------------------------------------------------------------------------------
+Monitorea tiendas normales rápido, y usa Chrome invisible para vuelos.
+Notifica el estado y precio desde la primera lectura sin quedarse callado.
 """
 
 import json
@@ -243,13 +243,10 @@ def send_discord(webhook_url, product_name, url, event_type, status=None, price_
     payload = {"embeds": [embed]}
     if event_type in ("stock", "price_drop"): payload["content"] = "<@911730868316418099>"
 
-    # --- CAMBIO APLICADO AQUÍ PARA DEPURAR DISCORD ---
     try:
         r = requests.post(webhook_url, json=payload, timeout=15)
         if r.status_code >= 300:
             log.error("❌ ERROR DE DISCORD (Código %s): %s", r.status_code, r.text)
-        else:
-            log.info("✅ Mensaje enviado con éxito a Discord.")
     except Exception as e:
         log.error("❌ Excepción conectando a Discord: %s", e)
 
@@ -309,8 +306,11 @@ def check_product(product, state, webhook_url, error_notify_after_failures):
 
     if had_failures: log.info("%s volvió a responder tras fallas.", name)
 
-    if status == "in_stock" and confirmed_status_before in ("out_of_stock", "unknown"):
+    # --- CAMBIO: AHORA NOTIFICA SIEMPRE EN LA PRIMERA LECTURA ---
+    if status == "in_stock" and confirmed_status_before in ("out_of_stock", "unknown") and confirmed_status_before is not None:
         send_discord(webhook_url, name, url, "stock", status=status, price_display=current_display, image_url=image_url)
+    elif status == "in_stock" and confirmed_status_before is None:
+        send_discord(webhook_url, name, url, "info", status=status, price_display=current_display, image_url=image_url, extra_note="👀 Primera lectura: Registrando estado y precio actual.")
     
     target_price = product.get("target_price")
     notify_price_drop = product.get("notify_on_price_drop", True)
@@ -323,6 +323,9 @@ def check_product(product, state, webhook_url, error_notify_after_failures):
             send_discord(webhook_url, name, url, "price_drop", price_display=current_display, image_url=image_url, extra_note=f"¡Llegó al objetivo! ({format_price(target_price, currency_sym)}).")
         elif plain_drop:
             send_discord(webhook_url, name, url, "price_drop", price_display=current_display, image_url=image_url, old_price_display=prev_display)
+        # --- CAMBIO: AVISA SI EL PRECIO ES BAJO DESDE LA PRIMERA LECTURA ---
+        elif target_price is not None and prev_price_val is None and price_val <= target_price:
+            send_discord(webhook_url, name, url, "price_drop", price_display=current_display, image_url=image_url, extra_note=f"Primera lectura: ¡El precio ya está dentro de tu objetivo de {format_price(target_price, currency_sym)}!")
 
     state[url] = {
         "status": status, "price": price_str, "currency": currency_sym, "name": name,
