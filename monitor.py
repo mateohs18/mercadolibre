@@ -1,5 +1,5 @@
 """
-Stock Monitor -> Discord (Edición Internacional + Cazador de Ofertas)
+Stock Monitor -> Discord (Edición Internacional + Cazador de Ofertas + Timeout Extendido)
 ---------------------------------------------------------------------
 Monitorea productos individuales o busca el precio más barato en una 
 página de resultados de búsqueda, ignorando accesorios baratos.
@@ -91,17 +91,25 @@ def fetch(url, retries=2):
             headers = dict(SESSION.headers)
             headers["User-Agent"] = ALT_USER_AGENT
         try:
-            resp = SESSION.get(url, headers=headers, timeout=20)
+            # ---> ACÁ ESTÁ EL CAMBIO CLAVE: timeout=60 en lugar de 20 <---
+            resp = SESSION.get(url, headers=headers, timeout=60)
             if resp.status_code == 403 and attempt < retries:
                 log.info("403 en intento %d, reintentando con otro User-Agent...", attempt + 1)
-                time.sleep(3)
+                time.sleep(5)  # Aumenté un poco el tiempo de espera para que LATAM no nos bloquee tan rápido
                 continue
             resp.raise_for_status()
             return resp.text
+        except requests.exceptions.Timeout as e:
+            last_exc = e
+            log.warning("Timeout en intento %d. La página está tardando demasiado...", attempt + 1)
+            if attempt < retries:
+                time.sleep(5)
+                continue
+            raise
         except requests.exceptions.HTTPError as e:
             last_exc = e
             if attempt < retries:
-                time.sleep(3)
+                time.sleep(5)
                 continue
             raise
         except Exception as e:
@@ -149,16 +157,10 @@ def parse_price(price_str):
         return None
 
 def extract_price_and_currency(html, soup, default_currency="$", find_cheapest=False, min_threshold=None):
-    """Extrae el precio, ya sea de un producto único o escaneando el más barato de toda la página."""
-    
-    # -------------------------------------------------------------
-    # MODO 1: CAZADOR DE OFERTAS (Busca el más barato en toda la URL)
-    # -------------------------------------------------------------
     if find_cheapest:
         currency_regex = r'([€£¥\$]|(?:R\$)|(?:US\$)|(?:ARS)|(?:MXN)|(?:CLP)|(?:COP)|(?:UYU)|(?:PEN))'
         number_regex = r'([\d]{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)'
 
-        # Buscamos TODAS las coincidencias en la página
         matches1 = re.findall(f'{currency_regex}\\s?{number_regex}', html, re.IGNORECASE)
         matches2 = re.findall(f'{number_regex}\\s?{currency_regex}', html, re.IGNORECASE)
 
@@ -167,7 +169,6 @@ def extract_price_and_currency(html, soup, default_currency="$", find_cheapest=F
         for curr, price_str in matches1:
             val = parse_price(price_str)
             if val is not None and val > 0:
-                # Si configuraste un mínimo (ej: $300) y este precio es menor (ej: funda de $15), lo ignora.
                 if min_threshold is not None and val < min_threshold:
                     continue
                 valid_prices.append((val, price_str, curr.upper()))
@@ -182,15 +183,10 @@ def extract_price_and_currency(html, soup, default_currency="$", find_cheapest=F
         if not valid_prices:
             return None, default_currency
 
-        # Ordenamos la lista de precios de menor a mayor
         valid_prices.sort(key=lambda x: x[0])
-        cheapest = valid_prices[0] # Agarramos el primero (el más barato)
-        
-        return cheapest[1], cheapest[2] # Devolvemos (precio_str, moneda)
+        cheapest = valid_prices[0] 
+        return cheapest[1], cheapest[2] 
 
-    # -------------------------------------------------------------
-    # MODO 2: PRODUCTO INDIVIDUAL (El comportamiento clásico)
-    # -------------------------------------------------------------
     og_price = soup.find("meta", property="og:price:amount")
     if og_price and og_price.get("content"):
         og_curr = soup.find("meta", property="og:price:currency")
@@ -234,7 +230,6 @@ def get_domain(url):
 
 
 def detect_status(html, soup, is_search_page=False):
-    # Si es una página de búsqueda, asumimos que siempre hay stock si cargó bien
     if is_search_page:
         return "in_stock"
 
@@ -346,7 +341,6 @@ def check_product(product, state, webhook_url, error_notify_after_failures):
     soup = BeautifulSoup(html, "html.parser")
     name = configured_name or extract_title(soup, url)
     
-    # Extraer precio (usando modo individual o modo listado)
     fallback_curr = product.get("currency_symbol", "$")
     price_str, currency_sym = extract_price_and_currency(
         html, soup, fallback_curr, 
@@ -355,7 +349,6 @@ def check_product(product, state, webhook_url, error_notify_after_failures):
     )
     price_val = parse_price(price_str)
     
-    # Estado (si es página de búsqueda y encontró precio, hay stock)
     raw_status = "in_stock" if (is_search_page and price_str) else detect_status(html, soup, is_search_page)
     
     current_display = format_price(price_val, currency_sym) if price_val else None
@@ -393,13 +386,11 @@ def check_product(product, state, webhook_url, error_notify_after_failures):
 
     if had_failures: log.info("%s volvió a responder tras varias fallas.", name)
 
-    # Notificaciones de Stock
     if status == "in_stock" and prev_status in ("out_of_stock", "unknown") and prev_status is not None:
         send_discord(webhook_url, name, url, "stock", status=status, price_display=current_display, image_url=image_url)
     elif status == "in_stock" and prev_status is None:
         log.info("Primer chequeo de %s: ya está disponible, no se notifica.", name)
 
-    # Notificaciones de Precio
     target_price = product.get("target_price")
     notify_price_drop = product.get("notify_on_price_drop", True)
     
