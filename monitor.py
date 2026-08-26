@@ -1,5 +1,5 @@
 """
-Stock Monitor -> Discord (Híbrido: API + Navegador Fantasma)
+Stock Monitor -> Discord (Híbrido: API + Navegador Fantasma + Logs de Discord)
 ---------------------------------------------------------------------
 Monitorea tiendas normales rápido, y usa Chrome invisible para 
 vencer el anti-bot de aerolíneas (LATAM, Despegar, etc.).
@@ -243,8 +243,15 @@ def send_discord(webhook_url, product_name, url, event_type, status=None, price_
     payload = {"embeds": [embed]}
     if event_type in ("stock", "price_drop"): payload["content"] = "<@911730868316418099>"
 
-    try: requests.post(webhook_url, json=payload, timeout=15)
-    except Exception as e: log.error("Excepción Discord: %s", e)
+    # --- CAMBIO APLICADO AQUÍ PARA DEPURAR DISCORD ---
+    try:
+        r = requests.post(webhook_url, json=payload, timeout=15)
+        if r.status_code >= 300:
+            log.error("❌ ERROR DE DISCORD (Código %s): %s", r.status_code, r.text)
+        else:
+            log.info("✅ Mensaje enviado con éxito a Discord.")
+    except Exception as e:
+        log.error("❌ Excepción conectando a Discord: %s", e)
 
 def check_product(product, state, webhook_url, error_notify_after_failures):
     url = product["url"]
@@ -328,7 +335,6 @@ def main():
     webhook_url = os.environ.get("DISCORD_WEBHOOK_URL") or config.get("discord_webhook_url")
     if not webhook_url: sys.exit("Falta discord_webhook_url en config.json")
 
-    # --- MENSAJE DE PRUEBA DE ARRANQUE ---
     log.info("Enviando mensaje de prueba a Discord para verificar webhook...")
     send_discord(
         webhook_url, 
