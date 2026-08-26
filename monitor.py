@@ -85,7 +85,6 @@ def fetch(url, retries=2, use_browser=False):
                 driver = uc.Chrome(options=options)
                 driver.get(url)
                 
-                # --- CAMBIO IMPORTANTE: 35 segundos para que terminen de buscar los vuelos ---
                 log.info("Esperando 35 segundos a que la página cargue los resultados...")
                 time.sleep(35) 
                 
@@ -144,48 +143,60 @@ def parse_price(price_str):
     try: return float(s)
     except ValueError: return None
 
-def extract_price_and_currency(html, soup, default_currency="$", find_cheapest=False, min_threshold=None):
-    # --- CAMBIO IMPORTANTE: Regex expandido para atrapar "COP $", "PEN S/", etc. ---
-    currency_regex = r'([€£¥\$]|(?:R\$)|(?:US\$)|(?:ARS\s?\$?)|(?:MXN\s?\$?)|(?:CLP\s?\$?)|(?:COP\s?\$?)|(?:UYU\s?\$?)|(?:PEN\s?S?/?))'
+def extract_price_and_currency(html, soup, default_currency="$", find_cheapest=False, min_threshold=None, domain=""):
+    # Limpiamos el HTML para leer texto puro sin etiquetas basura
+    clean_text = soup.get_text(separator=" ", strip=True)
+    
+    currency_regex = r'([€£¥\$]|R\$|US\$|ARS|MXN|CLP|COP|UYU|PEN|S/)'
     number_regex = r'([\d]{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)'
 
+    # Tolera espacios y signos extras como "COP $ 1.500"
+    pattern1 = f'{currency_regex}\\s*\\$?\\s*{number_regex}'
+    pattern2 = f'{number_regex}\\s*\\$?\\s*{currency_regex}'
+
     if find_cheapest:
-        matches1 = re.findall(f'{currency_regex}\\s?{number_regex}', html, re.IGNORECASE)
-        matches2 = re.findall(f'{number_regex}\\s?{currency_regex}', html, re.IGNORECASE)
+        matches1 = re.findall(pattern1, clean_text, re.IGNORECASE)
+        matches2 = re.findall(pattern2, clean_text, re.IGNORECASE)
 
         valid_prices = []
         for curr, price_str in matches1:
             val = parse_price(price_str)
-            if val and val > 0 and (min_threshold is None or val >= min_threshold):
-                valid_prices.append((val, price_str, curr.strip().upper()))
+            if val and val > 0:
+                if min_threshold is None or val >= min_threshold:
+                    valid_prices.append((val, price_str, curr.strip().upper()))
                 
         for price_str, curr in matches2:
             val = parse_price(price_str)
-            if val and val > 0 and (min_threshold is None or val >= min_threshold):
-                valid_prices.append((val, price_str, curr.strip().upper()))
+            if val and val > 0:
+                if min_threshold is None or val >= min_threshold:
+                    valid_prices.append((val, price_str, curr.strip().upper()))
 
-        if not valid_prices: return None, default_currency
+        if not valid_prices: 
+            log.info(f"[{domain}] Busqué precios pero no superaron el umbral mínimo (o no encontré ninguno).")
+            return None, default_currency
 
         valid_prices.sort(key=lambda x: x[0])
-        return valid_prices[0][1], valid_prices[0][2] 
+        cheapest = valid_prices[0]
+        log.info(f"[{domain}] Cazador de ofertas encontró {len(valid_prices)} precios válidos. El más bajo es: {cheapest[2]} {cheapest[0]}")
+        return cheapest[1], cheapest[2] 
 
+    # Modo producto individual
     og_price = soup.find("meta", property="og:price:amount")
     if og_price and og_price.get("content"):
         og_curr = soup.find("meta", property="og:price:currency")
         curr = og_curr["content"] if og_curr and og_curr.get("content") else default_currency
         return og_price["content"], curr
 
-    m1 = re.search(f'{currency_regex}\\s?{number_regex}', html, re.IGNORECASE)
+    m1 = re.search(pattern1, clean_text, re.IGNORECASE)
     if m1: return m1.group(2), m1.group(1).strip().upper()
     
-    m2 = re.search(f'{number_regex}\\s?{currency_regex}', html, re.IGNORECASE)
+    m2 = re.search(pattern2, clean_text, re.IGNORECASE)
     if m2: return m2.group(1), m2.group(2).strip().upper()
 
     return None, default_currency
 
 def format_price(value, currency):
     if value is None: return "N/A"
-    # Limpiamos si la moneda quedó redundante (ej: "COP $" -> "COP")
     clean_curr = currency.replace("$", "").strip() if len(currency) > 3 else currency
     if len(clean_curr) <= 2 or clean_curr.endswith('$') or clean_curr in ['€', '£', '¥']: 
         return f"{clean_curr}{value:,.2f}"
@@ -246,6 +257,8 @@ def check_product(product, state, webhook_url, error_notify_after_failures):
     min_threshold = product.get("min_price_threshold")
     prev = state.get(url, {})
 
+    domain = get_domain(url)
+
     try:
         html = fetch(url, use_browser=use_browser)
     except Exception as e:
@@ -262,7 +275,9 @@ def check_product(product, state, webhook_url, error_notify_after_failures):
     name = configured_name or extract_title(soup, url)
     
     fallback_curr = product.get("currency_symbol", "$")
-    price_str, currency_sym = extract_price_and_currency(html, soup, fallback_curr, is_search_page, min_threshold)
+    
+    # Extraemos precio con limpieza mejorada
+    price_str, currency_sym = extract_price_and_currency(html, soup, fallback_curr, is_search_page, min_threshold, domain)
     price_val = parse_price(price_str)
     
     raw_status = "in_stock" if (is_search_page and price_str) else detect_status(html, soup, is_search_page)
