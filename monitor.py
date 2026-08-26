@@ -248,7 +248,7 @@ def detect_status(html, debug=False):
 
 
 def send_discord(webhook_url, product_name, url, event_type, status=None, price=None,
-                  image_url=None, old_price=None, extra_note=None):
+                 image_url=None, old_price=None, extra_note=None):
     domain = get_domain(url)
 
     if event_type == "stock":
@@ -387,7 +387,8 @@ def check_product(product, state, webhook_url, error_notify_after_failures):
         crossed_target = (
             target_price is not None
             and price_val <= target_price
-            and (prev_price_val is None or prev_price_val > target_price)
+            and prev_price_val is not None  # Modificación aquí
+            and prev_price_val > target_price # Modificación aquí
         )
         plain_drop = (
             notify_price_drop
@@ -405,6 +406,9 @@ def check_product(product, state, webhook_url, error_notify_after_failures):
                 webhook_url, name, url, "price_drop", price=price_str, image_url=image_url,
                 old_price=prev_price_val,
             )
+        # Modificación aquí: Log para el primer chequeo si ya está en precio
+        elif target_price is not None and prev_price_val is None and price_val <= target_price:
+            log.info("Primer chequeo de %s: ya está en el precio objetivo, no se notifica (guardo estado).", name)
 
     state[url] = {
         "status": status,
