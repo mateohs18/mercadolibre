@@ -16,6 +16,12 @@
       "notify_on_price_drop": true
     },
     {
+      "url": "https://www.skyscanner.com.co/transport/flights/lim/clo/261005/261101/config/13571-2610051550--32115-1-10597-2610052215%7C10597-2611011330--32115-1-13571-2611011925?adultsv2=1&childrenv2=&cabinclass=economy&rtn=1&outboundaltsenabled=false&inboundaltsenabled=false&stops=!direct,!twoPlusStops",
+      "name": "VUELOS COLOMBIA A PERU",
+      "check_interval_seconds": 60,
+      "notify_on_price_drop": true
+    },
+    {
       "url": "https://a.co/d/0ho45Cvp",
       "name": "XBOX WIRELESS CONTROLLER – GEARS OF WAR",
       "check_interval_seconds": 60,
