@@ -1,97 +1,79 @@
-# Stock Monitor → Discord
+# Flight Price Watcher (LIM → CLO)
 
-Monitorea el link de cualquier producto (MercadoLibre, Amazon, eBay, tiendas
-genéricas) y te avisa por Discord apenas pasa de "sin stock" a "disponible".
+Monitorea el precio de tus dos itinerarios usando **Travelpayouts Data API**
+(la API de datos de Aviasales — gratis, autoservicio, sin captchas ni scraping)
+y te avisa por **Discord** cuando el precio baja. Corre gratis en la nube vía
+**GitHub Actions**, cada 3 horas, sin que tengas que dejar tu compu prendida.
 
-## 1. Instalación en tu VPS
+> **Nota:** originalmente iba a usar Amadeus, pero su portal self-service fue
+> decomisionado el 17 de julio de 2026 (solo quedó acceso Enterprise vía
+> contrato comercial). Por eso el script usa Travelpayouts, que sigue con
+> registro instantáneo y gratuito.
 
-```bash
-# Subí la carpeta al VPS (scp, git, etc.) y entrá a ella
-cd stock-monitor
+## 1. Crear cuenta gratis en Travelpayouts
 
-# Python 3.9+ recomendado
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+1. Andá a https://www.travelpayouts.com/ y registrate (es gratis, es una red
+   de afiliados de viajes — no necesitás tener un sitio web para usar la API
+   de datos).
+2. Una vez logueado, andá a tu perfil → sección **API token** (o
+   **"Access to API"**) y copiá tu token.
+3. Los precios que devuelve son de una caché (se actualizan periódicamente,
+   no en tiempo real estricto), pero es justamente el uso pensado para esto:
+   trackear tendencias de precio, no hacer una búsqueda de booking en vivo.
 
-## 2. Configuración
+## 2. Crear el webhook de Discord
 
-```bash
-cp config.example.json config.json
-nano config.json
-```
+1. En tu servidor de Discord: **Configuración del servidor → Integraciones → Webhooks → Nuevo Webhook**.
+2. Elegí el canal donde querés recibir los avisos.
+3. Copiá la **URL del webhook**.
 
-- `discord_webhook_url`: el link del webhook que ya tenés (Discord → Configuración
-  del canal → Integraciones → Webhooks → Copiar URL del webhook).
-- `check_interval_seconds`: cada cuánto revisa TODOS los productos (300 = 5 min).
-  No lo bajes demasiado o corrés riesgo de que el sitio te bloquee la IP.
-- `products`: lista de productos. Cada uno necesita `url`. `name` es opcional
-  (si no lo ponés, el script intenta sacar el título de la página sola).
+## 3. Subir este proyecto a GitHub
 
-Para agregar un producto nuevo, solo agregás un objeto más al array:
-
-```json
-{ "url": "https://pegá-el-link-acá" }
-```
-
-## 3. Probarlo
+1. Creá un repositorio nuevo (puede ser privado) en GitHub.
+2. Subí todos estos archivos (`monitor.py`, `requirements.txt`, `state.json`,
+   `.github/workflows/flight_watch.yml`, este README).
 
 ```bash
-python3 monitor.py
+git init
+git add .
+git commit -m "Flight price watcher"
+git branch -M main
+git remote add origin https://github.com/TU_USUARIO/TU_REPO.git
+git push -u origin main
 ```
 
-Vas a ver logs como:
+## 4. Configurar los secrets en GitHub
 
-```
-2026-08-24 12:00:01 [INFO] Monitoreando 3 producto(s) cada 300s
-2026-08-24 12:00:02 [INFO] Set de Actualización Panini... -> out_of_stock (antes: None)
-```
+En tu repo: **Settings → Secrets and variables → Actions → New repository secret**.
+Agregá estos dos:
 
-La primera vez que ve un producto guarda el estado pero NO te avisa (para no
-spamear apenas arrancás el bot). A partir de ahí, cualquier cambio de
-`out_of_stock`/`unknown` → `in_stock` dispara la notificación a Discord.
+| Nombre                  | Valor                                  |
+|--------------------------|-----------------------------------------|
+| `TRAVELPAYOUTS_TOKEN`    | tu token de Travelpayouts               |
+| `DISCORD_WEBHOOK_URL`    | la URL del webhook de Discord          |
 
-## 4. Dejarlo corriendo 24/7 (systemd)
+## 5. ¡Listo!
 
-Editá `stock-monitor.service` con tu usuario y ruta real, después:
+El workflow ya está programado para correr solo cada 3 horas
+(`.github/workflows/flight_watch.yml`). También podés probarlo manualmente:
+pestaña **Actions** de tu repo → **Flight Price Watcher** → **Run workflow**.
 
-```bash
-sudo cp stock-monitor.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now stock-monitor
-sudo systemctl status stock-monitor
-journalctl -u stock-monitor -f   # ver logs en vivo
-```
+La primera vez que corre para cada viaje te va a avisar el precio inicial.
+Las próximas veces, solo te va a escribir si el precio **bajó** respecto al
+mínimo visto hasta ahora.
 
-## Cómo detecta disponibilidad (modo genérico)
+## Personalización
 
-El script busca frases típicas en el HTML de la página:
+- **Cambiar frecuencia**: editá la línea `cron` en el workflow
+  (por ejemplo `"0 */1 * * *"` para cada hora).
+- **Agregar/quitar viajes**: editá la lista `TRIPS` en `monitor.py`.
+- **Umbral de precio en vez de "cualquier baja"**: si preferís que solo te
+  avise cuando el precio esté por debajo de un número fijo (ej. $250), decime
+  y te ajusto la lógica.
 
-- **Sin stock**: "sin stock", "agotado", "producto pausado", "out of stock",
-  "sold out", "currently unavailable", etc.
-- **Disponible**: "agregar al carrito", "comprar ahora", "add to cart",
-  "buy now", "in stock", etc.
+## Por qué esto y no un bot contra Skyscanner
 
-También intenta sacar el precio de metadatos comunes (`itemprop="price"`,
-`og:price:amount`, JSON embebido con `"price"`).
-
-## Limitaciones a tener en cuenta
-
-- **Amazon y eBay** tienen protecciones anti-bot bastante agresivas. A veces
-  van a devolver una página de "verificación" (captcha) en vez del producto
-  real. Si eso pasa seguido con una URL puntual, avisame y le agrego lógica
-  específica para ese sitio (headers extra, endpoint alternativo, etc.).
-- La detección "genérica" por palabras clave funciona bien en la mayoría de
-  tiendas, pero algún sitio raro puede no matchear ningún patrón (queda como
-  `unknown`, no te va a avisar hasta que puedas ver por qué).
-- Revisá los Términos de Servicio del sitio que estés monitoreando; esto está
-  pensado para uso personal (avisarte a vos cuando algo vuelve a stock), no
-  para scraping masivo o reventa automatizada.
-- Si un sitio requiere login para ver stock, este script no va a poder verlo.
-
-## Personalizar más
-
-Si querés que te avise también por **baja de precio** (no solo stock), o que
-uno de los productos use un selector específico porque el genérico no le
-funciona bien, decime cuál y te lo agrego.
+Skyscanner pone captchas justamente para bloquear el scraping automatizado;
+saltárselos violaría sus términos de uso. Travelpayouts, en cambio, es una
+API pública de datos de vuelos pensada para que la uses así, sin
+restricciones artificiales que romper.
