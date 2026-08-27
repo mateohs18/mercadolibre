@@ -106,7 +106,7 @@ def search_cheapest_price(trip):
         "origin": trip["origin"],
         "destination": trip["destination"],
         "depart_date": month,
-        "return_date": trip["return_date"],
+        "return_date": trip["return_date"][:7],  # mes, no dia exacto (menos restrictivo)
         "calendar_type": "departure_date",
         "currency": "cop",
         "token": TRAVELPAYOUTS_TOKEN,
