@@ -51,6 +51,7 @@ Agregá estos dos:
 |--------------------------|-----------------------------------------|
 | `TRAVELPAYOUTS_TOKEN`    | tu token de Travelpayouts               |
 | `DISCORD_WEBHOOK_URL`    | la URL del webhook de Discord          |
+| `DISCORD_MENTION_USER_ID`| (opcional) tu ID de usuario de Discord, para que te mencione en cada aviso |
 
 ## 5. ¡Listo!
 
@@ -83,6 +84,34 @@ Si preferís Railway:
 
 Si no te complica el tema del Volume, **GitHub Actions es más simple** para
 este caso puntual (persistencia gratis vía git, sin configurar storage aparte).
+
+## ¿Por qué no me notificó todavía?
+
+Si configuraste todo y aún no llegó ningún mensaje a Discord, revisá en este orden:
+
+1. **¿Corrió el workflow al menos una vez?**
+   - GitHub Actions: pestaña **Actions** de tu repo → tenés que ver una
+     ejecución de "Flight Price Watcher". Si no hay ninguna, andá a
+     **Run workflow** manualmente para forzar la primera corrida (no hace
+     falta esperar al cron).
+   - Railway: en el servicio, pestaña **Deployments** o **Logs** — tiene que
+     mostrar una ejecución reciente del cron.
+2. **Miralo en los logs.** Si `monitor.py` tira error, vas a verlo ahí (por
+   ejemplo: token inválido, secret mal escrito, o `KeyError` si falta una
+   variable de entorno). Un error típico es un secret con espacios de más al
+   copiar/pegar el token.
+3. **¿La API devolvió ofertas?** El script imprime `Sin ofertas disponibles.`
+   si Travelpayouts no tiene datos cacheados para esa ruta/fechas exactas
+   (pasa más en rutas con poco volumen, como LIM-CLO). Si ves ese mensaje en
+   los logs, no es un bug — simplemente esa fuente no tiene precio guardado
+   para esas fechas todavía.
+4. **¿Revisaste el canal correcto?** El webhook solo postea en el canal que
+   elegiste al crearlo.
+5. **La primera notificación no es "bajó el precio"**, es un aviso de
+   "empecé a monitorear" con el precio inicial. Si nunca viste ni siquiera
+   ese primer mensaje, el problema está en los pasos 1-4.
+
+Contame qué ves en los logs de la última corrida y te ayudo a diagnosticarlo.
 
 ## Sobre la frecuencia (cada 30 min)
 

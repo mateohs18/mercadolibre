@@ -16,6 +16,7 @@ import requests
 
 TRAVELPAYOUTS_TOKEN = os.environ["TRAVELPAYOUTS_TOKEN"]
 DISCORD_WEBHOOK_URL = os.environ["DISCORD_WEBHOOK_URL"]
+DISCORD_MENTION_USER_ID = os.environ.get("DISCORD_MENTION_USER_ID", "").strip()
 
 BASE_URL = "https://api.travelpayouts.com"
 
@@ -89,21 +90,31 @@ def save_state(state):
 
 
 def notify_discord(trip, price, previous_price):
+    mention = f"<@{DISCORD_MENTION_USER_ID}> " if DISCORD_MENTION_USER_ID else ""
+
     if previous_price is None:
         content = (
-            f"👀 Empecé a monitorear **{trip['origin']} → {trip['destination']}** "
+            f"{mention}👀 Empecé a monitorear **{trip['origin']} → {trip['destination']}** "
             f"({trip['departure_date']} - {trip['return_date']}). "
             f"Precio actual: **${price:.2f} USD**"
         )
     else:
         diff = previous_price - price
         content = (
-            f"📉 ¡Bajó el precio! **{trip['origin']} → {trip['destination']}** "
+            f"{mention}📉 ¡Bajó el precio! **{trip['origin']} → {trip['destination']}** "
             f"({trip['departure_date']} - {trip['return_date']})\n"
             f"Antes: ${previous_price:.2f} USD → Ahora: **${price:.2f} USD** "
             f"(bajó ${diff:.2f})"
         )
-    requests.post(DISCORD_WEBHOOK_URL, json={"content": content})
+
+    payload = {
+        "content": content,
+        # Sin esto, Discord puede ignorar la mención por seguridad en algunos casos.
+        "allowed_mentions": {"users": [DISCORD_MENTION_USER_ID]} if DISCORD_MENTION_USER_ID else {},
+    }
+    resp = requests.post(DISCORD_WEBHOOK_URL, json=payload)
+    if resp.status_code >= 300:
+        print(f"[discord] Error {resp.status_code} al notificar: {resp.text[:300]}")
 
 
 def main():
