@@ -57,7 +57,7 @@ def search_cheapest_price(trip):
         "unique": "false",
         "sorting": "price",
         "direct": "false",
-        "currency": "usd",
+        "currency": "cop",
         "limit": 5,
         "token": TRAVELPAYOUTS_TOKEN,
     }
@@ -80,7 +80,7 @@ def search_cheapest_price(trip):
         "destination": trip["destination"],
         "depart_date": month,
         "calendar_type": "departure_date",
-        "currency": "usd",
+        "currency": "cop",
         "token": TRAVELPAYOUTS_TOKEN,
     }
     resp2 = requests.get(f"{BASE_URL}/v1/prices/calendar", params=params2)
@@ -94,7 +94,7 @@ def search_cheapest_price(trip):
               f"({month}). Respuesta cruda: {resp2.text[:300]}")
         return None
 
-    day_prices = body2["data"].get(trip["destination"], {})
+    day_prices = body2.get("data", {})
     if not day_prices:
         print(f"[{trip['id']}] Sin ofertas disponibles. Respuesta cruda: {resp2.text[:300]}")
         return None
@@ -116,6 +116,11 @@ def save_state(state):
         json.dump(state, f, indent=2)
 
 
+def format_cop(amount):
+    # 1850000 -> "$1.850.000 COP" (estilo colombiano: punto como separador de miles, sin decimales)
+    return f"${amount:,.0f} COP".replace(",", ".")
+
+
 def notify_discord(trip, price, previous_price):
     mention = f"<@{DISCORD_MENTION_USER_ID}> " if DISCORD_MENTION_USER_ID else ""
 
@@ -123,15 +128,15 @@ def notify_discord(trip, price, previous_price):
         content = (
             f"{mention}👀 Empecé a monitorear **{trip['origin']} → {trip['destination']}** "
             f"({trip['departure_date']} - {trip['return_date']}). "
-            f"Precio actual: **${price:.2f} USD**"
+            f"Precio actual: **{format_cop(price)}**"
         )
     else:
         diff = previous_price - price
         content = (
             f"{mention}📉 ¡Bajó el precio! **{trip['origin']} → {trip['destination']}** "
             f"({trip['departure_date']} - {trip['return_date']})\n"
-            f"Antes: ${previous_price:.2f} USD → Ahora: **${price:.2f} USD** "
-            f"(bajó ${diff:.2f})"
+            f"Antes: {format_cop(previous_price)} → Ahora: **{format_cop(price)}** "
+            f"(bajó {format_cop(diff)})"
         )
 
     payload = {
@@ -154,7 +159,7 @@ def main():
             continue
 
         previous_price = state.get(trip["id"])
-        print(f"[{trip['id']}] Precio actual: ${price:.2f} | Previo: {previous_price}")
+        print(f"[{trip['id']}] Precio actual: {format_cop(price)} | Previo: {previous_price}")
 
         if previous_price is None:
             notify_discord(trip, price, None)
