@@ -62,6 +62,37 @@ La primera vez que corre para cada viaje te va a avisar el precio inicial.
 Las próximas veces, solo te va a escribir si el precio **bajó** respecto al
 mínimo visto hasta ahora.
 
+## Alternativa: correrlo en Railway en vez de GitHub Actions
+
+Si preferís Railway:
+
+1. **No lo deployes como servicio web** — es un script, no un servidor. En tu
+   proyecto de Railway, creá el servicio como **Cron Job** (no "Empty Service"
+   con puerto expuesto).
+2. El archivo `railway.json` ya incluido le dice a Railway el comando de
+   arranque (`python monitor.py`) y la frecuencia (`*/30 * * * *` = cada 30 min).
+3. **Importante — persistencia**: cada corrida del cron en Railway usa un
+   contenedor nuevo y descartable. Sin storage persistente, `state.json` se
+   reinicia cada vez y vas a recibir el aviso de "precio inicial" en cada
+   corrida en vez de solo cuando baja. Para evitarlo:
+   - En el servicio, andá a **Settings → Volumes** y creá un Volume montado
+     en `/data`.
+   - Agregá la variable de entorno `STATE_FILE_PATH=/data/state.json`.
+4. Variables de entorno a configurar en el servicio (Settings → Variables):
+   `TRAVELPAYOUTS_TOKEN`, `DISCORD_WEBHOOK_URL`, y `STATE_FILE_PATH` (si usás Volume).
+
+Si no te complica el tema del Volume, **GitHub Actions es más simple** para
+este caso puntual (persistencia gratis vía git, sin configurar storage aparte).
+
+## Sobre la frecuencia (cada 30 min)
+
+Funciona, pero un dato a tener en cuenta: los precios de Travelpayouts vienen
+de una caché que no se actualiza al segundo — suele refrescarse cada tanto
+(horas), no en tiempo real. Escanear cada 30 min no rompe nada ni te van a
+banear, pero es probable que varias corridas seguidas devuelvan el mismo
+precio cacheado. No hace falta bajar más la frecuencia de la que la fuente
+realmente actualiza, pero tampoco molesta si querés dejarlo así por las dudas.
+
 ## Personalización
 
 - **Cambiar frecuencia**: editá la línea `cron` en el workflow

@@ -19,7 +19,10 @@ DISCORD_WEBHOOK_URL = os.environ["DISCORD_WEBHOOK_URL"]
 
 BASE_URL = "https://api.travelpayouts.com"
 
-STATE_FILE = "state.json"
+# En GitHub Actions dejamos el default (se commitea de vuelta al repo).
+# En Railway, seteá STATE_FILE_PATH=/data/state.json y montá un Volume en /data
+# para que el historial de precios sobreviva entre corridas del cron.
+STATE_FILE = os.environ.get("STATE_FILE_PATH", "state.json")
 
 # --- Definí acá los viajes que querés monitorear (origen, destino, fechas) ---
 TRIPS = [
