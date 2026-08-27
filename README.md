@@ -122,6 +122,23 @@ banear, pero es probable que varias corridas seguidas devuelvan el mismo
 precio cacheado. No hace falta bajar más la frecuencia de la que la fuente
 realmente actualiza, pero tampoco molesta si querés dejarlo así por las dudas.
 
+## Cobertura limitada en rutas poco transitadas (como LIM-CLO)
+
+Travelpayouts cachea mejor las rutas con más búsquedas. Si tu ruta es de bajo
+tráfico, puede no tener precio guardado para el día exacto. El script ahora
+prueba dos niveles:
+
+1. **Fecha exacta** (más preciso).
+2. **Fallback al mes completo** si no hay dato exacto — te da el precio más
+   barato encontrado en todo el mes como referencia, aclarando en los logs
+   que no es el de la fecha puntual.
+
+Si ni siquiera el mes completo devuelve datos, es una señal de que
+Travelpayouts directamente no tiene cache para esa ruta específica. En ese
+caso, como sanity check, podés probar el script contra una ruta más popular
+(ej. `LIM` → `BOG`) para confirmar que el token funciona — si esa sí trae
+datos, el problema es 100% cobertura de la ruta, no configuración.
+
 ## Personalización
 
 - **Cambiar frecuencia**: editá la línea `cron` en el workflow

@@ -47,6 +47,8 @@ TRIPS = [
 
 
 def search_cheapest_price(trip):
+    # Intento 1: fechas exactas (mas preciso, pero esta ruta tiene poco trafico
+    # y puede no tener cache para el dia puntual).
     params = {
         "origin": trip["origin"],
         "destination": trip["destination"],
@@ -59,22 +61,47 @@ def search_cheapest_price(trip):
         "limit": 5,
         "token": TRAVELPAYOUTS_TOKEN,
     }
-    resp = requests.get(
-        f"{BASE_URL}/aviasales/v3/prices_for_dates",
-        params=params,
-    )
+    resp = requests.get(f"{BASE_URL}/aviasales/v3/prices_for_dates", params=params)
     if resp.status_code != 200:
-        print(f"[{trip['id']}] Error {resp.status_code}: {resp.text[:300]}")
+        print(f"[{trip['id']}] Error {resp.status_code} (fechas exactas): {resp.text[:300]}")
+    else:
+        offers = resp.json().get("data", [])
+        if offers:
+            cheapest = min(offers, key=lambda o: float(o["price"]))
+            return float(cheapest["price"])
+        print(f"[{trip['id']}] Sin datos para fecha exacta, probando el mes completo...")
+
+    # Intento 2 (fallback): mismo par origen/destino, sin filtrar por fecha
+    # exacta -> usa el endpoint de calendario, que suele tener mas cobertura
+    # para rutas de bajo trafico.
+    month = trip["departure_date"][:7]  # "2026-10-05" -> "2026-10"
+    params2 = {
+        "origin": trip["origin"],
+        "destination": trip["destination"],
+        "depart_date": month,
+        "calendar_type": "departure_date",
+        "currency": "usd",
+        "token": TRAVELPAYOUTS_TOKEN,
+    }
+    resp2 = requests.get(f"{BASE_URL}/v1/prices/calendar", params=params2)
+    if resp2.status_code != 200:
+        print(f"[{trip['id']}] Error {resp2.status_code} (mes completo): {resp2.text[:300]}")
         return None
 
-    body = resp.json()
-    offers = body.get("data", [])
-    if not offers:
-        print(f"[{trip['id']}] Sin ofertas disponibles.")
+    body2 = resp2.json()
+    if not body2.get("success") or not body2.get("data"):
+        print(f"[{trip['id']}] Sin ofertas disponibles ni siquiera para el mes completo "
+              f"({month}). Respuesta cruda: {resp2.text[:300]}")
         return None
 
-    cheapest = min(offers, key=lambda o: float(o["price"]))
-    return float(cheapest["price"])
+    day_prices = body2["data"].get(trip["destination"], {})
+    if not day_prices:
+        print(f"[{trip['id']}] Sin ofertas disponibles. Respuesta cruda: {resp2.text[:300]}")
+        return None
+
+    cheapest_day = min(day_prices.values(), key=lambda o: float(o["price"]))
+    print(f"[{trip['id']}] Usando precio del mes completo (no de la fecha exacta) como referencia.")
+    return float(cheapest_day["price"])
 
 
 def load_state():
